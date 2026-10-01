@@ -19,6 +19,8 @@ import org.springframework.security.web.authentication.rememberme.PersistentToke
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 
 import java.util.Map;
 
@@ -37,11 +39,28 @@ public class AuthController {
     public record GoogleLoginRequest(@NotBlank String idToken, boolean rememberMe) {}
 
     /** Primes the XSRF-TOKEN cookie — called by Login.jsx on mount. */
-    @GetMapping("/public/auth/me")
-    public ResponseEntity<?> primeCsrf(HttpServletRequest request) {
-        CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
-        if (token != null) token.getToken();
-        return ResponseEntity.status(401).body(Map.of("authenticated", false));
+    @GetMapping("/public/csrf")
+    public ResponseEntity<?> csrf(CsrfToken token) {
+        return ResponseEntity.ok(Map.of(
+                "token", token.getToken()
+        ));
+    }
+
+    @GetMapping("/auth/me")
+    public ResponseEntity<?> currentUser(Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("authenticated", false));
+        }
+
+        LoginService.AuthResponse user =
+                loginService.findAuthResponseByEmail(authentication.getName());
+
+        return ResponseEntity.ok(Map.of(
+                "authenticated", true,
+                "user", user
+        ));
     }
 
     /** SIGNUP — save credentials to DB. */
@@ -53,27 +72,84 @@ public class AuthController {
 
     /** GOOGLE SIGN-IN. */
     @PostMapping("/auth/google")
-    public ResponseEntity<?> google(@Valid @RequestBody GoogleLoginRequest req,
-                                    HttpServletRequest httpReq,
-                                    HttpServletResponse httpRes) {
+    public ResponseEntity<?> google(
+            @Valid @RequestBody GoogleLoginRequest req,
+            HttpServletRequest httpReq,
+            HttpServletResponse httpRes) {
 
-        var gu = googleService.verify(req.idToken());
+        try {
+            // 1. Verify Google ID token
+            var gu = googleService.verify(req.idToken());
 
-        User u = userRepository.findByEmailNative(gu.email()).orElseGet(() -> {
-            var created = registrationService.registerGoogleUser(gu.sub(), gu.email(), gu.name());
-            return userRepository.findById(created.userId()).orElseThrow();
-        });
+            // 2. Check whether email already exists
+            User u = userRepository.findByEmailNative(gu.email())
+                    .orElse(null);
 
-        UserDetails details = loginService.loadUserByUsername(u.getEmail());
-        Authentication auth = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        securityContextRepository.saveContext(SecurityContextHolder.getContext(), httpReq, httpRes);
+            // 3. DO NOT INSERT a new user
+            if (u == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of(
+                                "success", false,
+                                "message", "This email is not registered with us. Please sign up first."
+                        ));
+            }
 
-        if (req.rememberMe()) {
-            rememberMeServices.loginSuccess(httpReq, httpRes, auth);
+            // 4. Existing user only - load authorities
+            UserDetails details =
+                    loginService.loadUserByUsername(u.getEmail());
+
+            // 5. Create authentication
+            Authentication auth =
+                    new UsernamePasswordAuthenticationToken(
+                            details,
+                            null,
+                            details.getAuthorities()
+                    );
+
+            // 6. Store authentication in SecurityContext
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
+            securityContextRepository.saveContext(
+                    SecurityContextHolder.getContext(),
+                    httpReq,
+                    httpRes
+            );
+
+            // 7. Remember me if selected
+            if (req.rememberMe()) {
+                rememberMeServices.loginSuccess(
+                        httpReq,
+                        httpRes,
+                        auth
+                );
+            }
+
+            // 8. Return existing user details
+            var body =
+                    loginService.findAuthResponseByEmail(u.getEmail());
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "success", true,
+                            "user", body
+                    )
+            );
+
+        } catch (IllegalStateException e) {
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of(
+                            "success", false,
+                            "message", e.getMessage()
+                    ));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(
+                            "success", false,
+                            "message", "Google sign-in failed. Please try again."
+                    ));
         }
-
-        var body = loginService.findAuthResponseByEmail(u.getEmail());
-        return ResponseEntity.ok(Map.of("success", true, "user", body));
     }
 }

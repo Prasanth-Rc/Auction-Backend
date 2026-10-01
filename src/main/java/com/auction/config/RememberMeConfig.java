@@ -14,12 +14,20 @@ public class RememberMeConfig {
             LoginService loginService,
             JpaPersistentTokenRepository persistentTokenRepository) {
 
-        var svc = new PersistentTokenBasedRememberMeServices(
-                "auction-remember-key", loginService, persistentTokenRepository);
-        svc.setTokenValiditySeconds(14 * 24 * 3600);
-        svc.setParameter("remember-me");
-        svc.setCookieName("AUCTION_REMEMBER_ME");
-        svc.setUseSecureCookie(true);
-        return svc;
+        var service = new PersistentTokenBasedRememberMeServices(
+                "auction-remember-key",
+                loginService,
+                persistentTokenRepository
+        );
+
+        service.setTokenValiditySeconds(14 * 24 * 3600);
+
+        service.setParameter("remember-me");
+
+        service.setCookieName("AUCTION_REMEMBER_ME");
+
+        service.setUseSecureCookie(true);
+
+        return service;
     }
 }

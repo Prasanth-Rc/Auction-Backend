@@ -84,9 +84,34 @@ public class SecurityConfig {
                         .permitAll())
                 .logout(l -> l
                         .logoutUrl("/api/logout")
-                        .logoutSuccessHandler(logoutSuccessHandler)
-                        .invalidateHttpSession(true)
+
+                        // Remove authentication from SecurityContext
                         .clearAuthentication(true)
+
+                        // Invalidate the HTTP session
+                        .invalidateHttpSession(true)
+
+                        // Delete browser cookies
+                        .deleteCookies(
+                                "JSESSIONID",
+                                "AUCTION_REMEMBER_ME",
+                                "XSRF-TOKEN"
+                        )
+
+                        // Remove the Remember-Me token from persistent_logins
+                        .addLogoutHandler((request, response, authentication) -> {
+                            if (authentication != null) {
+                                rememberMeServices.logout(
+                                        request,
+                                        response,
+                                        authentication
+                                );
+                            }
+                        })
+
+                        // Return your JSON logout response
+                        .logoutSuccessHandler(logoutSuccessHandler)
+
                         .permitAll())
                 .httpBasic(b -> b.disable());
 

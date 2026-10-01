@@ -69,7 +69,7 @@ public class RegistrationService {
         if (id == null) throw new IllegalStateException("Insert failed");
 
         // 3. Role
-        userRepository.insertRoleNative(id, "ROLE_USER");
+        userRepository.insertRoleNative(id, req.representing());
 
         return AuthResponse.builder()
                 .userId(id)
@@ -94,14 +94,14 @@ public class RegistrationService {
                 email.toLowerCase(),
                 "",
                 "",
-                "Owner",
+                "",
                 null, null, null, null, null,
                 sub);
 
         Long id = userRepository.findIdByEmailNative(email);
         if (id == null) throw new IllegalStateException("Insert failed");
 
-        userRepository.insertRoleNative(id, "ROLE_USER");
+        userRepository.insertRoleNative(id, "");
 
         return AuthResponse.builder()
                 .userId(id)

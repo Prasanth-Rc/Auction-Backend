@@ -19,7 +19,7 @@ import java.util.Map;
 public class JsonAuthSuccessHandler implements AuthenticationSuccessHandler {
 
     private final LoginService loginService;
-    private final PersistentTokenBasedRememberMeServices rememberMeServices;
+//    private final PersistentTokenBasedRememberMeServices rememberMeServices;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -27,9 +27,9 @@ public class JsonAuthSuccessHandler implements AuthenticationSuccessHandler {
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException {
 
-        if ("true".equalsIgnoreCase(request.getParameter("remember-me"))) {
-            rememberMeServices.loginSuccess(request, response, authentication);
-        }
+//        if ("true".equalsIgnoreCase(request.getParameter("remember-me"))) {
+//            rememberMeServices.loginSuccess(request, response, authentication);
+//        }
 
         var user = loginService.findAuthResponseByEmail(authentication.getName());
 

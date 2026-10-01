@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "app_user")
+@Table(name = "app_user", schema = "auction")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class User {
 
@@ -35,7 +35,7 @@ public class User {
     private LocalDateTime updatedAt;
 
     @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
+    @CollectionTable(name = "user_roles", schema = "auction", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role")
     private List<String> roles;
 }
